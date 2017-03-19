@@ -169,23 +169,14 @@ PGE_GameSaveDB::PGE_GameSaveDB(const std::string &filePath)
     open(filePath);
 }
 
-PGE_GameSaveDB::PGE_GameSaveDB(const PGE_GameSaveDB &o)
-{
-    PGE_assert(o.p);
-    p = new PGE_GameSaveDB_private;
-    open(o.p->m_filePath);
-}
-
 PGE_GameSaveDB::PGE_GameSaveDB(PGE_GameSaveDB &&o)
-    : p(o.p)
+    : p(std::move(o.p))
 {}
 
 PGE_GameSaveDB::~PGE_GameSaveDB()
 {
     PGE_assert(p);
     close();
-    delete p;
-    p = nullptr;
 }
 
 bool PGE_GameSaveDB::open(const std::string &filePath)

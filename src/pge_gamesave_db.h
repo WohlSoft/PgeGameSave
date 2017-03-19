@@ -2,15 +2,16 @@
 #define PGE_GAMESAVE_DB_H
 
 #include <string>
+#include <memory>
 
 struct PGE_GameSaveDB_private;
 class PGE_GameSaveDB
 {
-    PGE_GameSaveDB_private *p;
+    std::unique_ptr<PGE_GameSaveDB_private> p;
 public:
     PGE_GameSaveDB();
     PGE_GameSaveDB(const std::string &filePath);
-    PGE_GameSaveDB(const PGE_GameSaveDB &o);
+    PGE_GameSaveDB(const PGE_GameSaveDB &o) = delete;
     PGE_GameSaveDB(PGE_GameSaveDB &&o);
     virtual ~PGE_GameSaveDB();
     bool open(const std::string &filePath);
