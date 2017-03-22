@@ -59,17 +59,17 @@ public:
     enum VAR_TYPE
     {
         //! As plane-text string
-        VAR_STRING  = 0,
+        VTYPE_PLAIN_TEXT  = 0,
         //! As integer value
-        VAR_INTEGER,
+        VTYPE_INTEGER,
         //! As floating-point number
-        VAR_FLOATING_POINT,
+        VTYPE_FLOATING_POINT,
         //! As JSON converted from a lua-table
-        VAR_JSON,
+        VTYPE_JSON,
         //! Store in ecrypted by external function form
-        VAR_EXT_ENCRYPTED /*(possibly will not be needed if cyphers will do encryption
-                            before giving data to this function, or just used as marker to
-                            have easier detect encrypted data from regular plane-text string)*/
+        VTYPE_EXT_ENCRYPTED /*(possibly will not be needed if cyphers will do encryption
+                              before giving data to this function, or just used as marker to
+                              have easier detect encrypted data from regular plane-text string)*/
     };
 
     enum VAR_ACCESS_LEVEL
@@ -80,13 +80,25 @@ public:
         VAR_ACCESS_WORLD,
     };
 
-    bool variableGet(VAR_ACCESS_LEVEL al, const std::string &name, std::string  *output = nullptr, const std::string &defValue = "");
-    bool variableGet(VAR_ACCESS_LEVEL al, const std::string &name, double       *output = nullptr, const double &defValue = 0.0);
-    bool variableGet(VAR_ACCESS_LEVEL al, const std::string &name, int64_t      *output = nullptr, const int64_t &defValue = 0);
+    bool variableGet(VAR_ACCESS_LEVEL al, const std::string &name,
+                     std::string *output, const std::string &defValue = "",
+                     VAR_TYPE type = VTYPE_PLAIN_TEXT);
+    bool variableGet(VAR_ACCESS_LEVEL al,
+                     const std::string &name,
+                     double       *output, const double &defValue = 0.0);
+    bool variableGet(VAR_ACCESS_LEVEL al,
+                     const std::string &name,
+                     int64_t      *output, const int64_t &defValue = 0);
 
-    bool variableSet(VAR_ACCESS_LEVEL al, const std::string &name, std::string  *output = nullptr);
-    bool variableSet(VAR_ACCESS_LEVEL al, const std::string &name, double       *output = nullptr);
-    bool variableSet(VAR_ACCESS_LEVEL al, const std::string &name, int64_t      *output = nullptr);
+    bool variableSet(VAR_ACCESS_LEVEL al,
+                     const std::string &name, const std::string  &output,
+                     VAR_TYPE type = VTYPE_PLAIN_TEXT);
+    bool variableSet(VAR_ACCESS_LEVEL al,
+                     const std::string &name,
+                     double       output);
+    bool variableSet(VAR_ACCESS_LEVEL al,
+                     const std::string &name,
+                     int64_t      output);
 
     //! Working state values are will be taken for a save
     struct SaveData

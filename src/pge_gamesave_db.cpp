@@ -218,9 +218,8 @@ bool PGE_GameSaveDB::save()
 }
 
 bool PGE_GameSaveDB::variableGet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
-                                 const std::string &name,
-                                 std::string *output,
-                                 const std::string &defValue)
+                                 const std::string &name, std::string *output,
+                                 const std::string &defValue, PGE_GameSaveDB::VAR_TYPE type)
 {
     return false;
 }
@@ -243,21 +242,23 @@ bool PGE_GameSaveDB::variableGet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
 
 bool PGE_GameSaveDB::variableSet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
                                  const std::string &name,
-                                 std::string *output)
+                                 const std::string &output,
+                                 PGE_GameSaveDB::VAR_TYPE type)
 {
     return false;
 }
 
 bool PGE_GameSaveDB::variableSet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
                                  const std::string &name,
-                                 double *output)
+                                 double output)
 {
     return false;
 }
 
 bool PGE_GameSaveDB::variableSet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
                                  const std::string &name,
-                                 int64_t *output)
+                                 int64_t output)
 {
     return false;
 }
+
