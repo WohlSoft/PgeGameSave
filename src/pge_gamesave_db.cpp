@@ -17,11 +17,8 @@
 
 struct PGE_GameSaveDB_private
 {
-    static int createCallback(void *, int /*argc*/, char ** /*argv*/, char ** /*azColName*/)
+    static int dummyCallback(void *, int /*argc*/, char ** /*argv*/, char ** /*azColName*/)
     {
-        //for(int i = 0; i < argc; i++)
-        //    printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
-        //printf("\n");
         return 0;
     }
 
@@ -29,11 +26,13 @@ struct PGE_GameSaveDB_private
     {
         PGE_GameSaveDB_private *pgedb = reinterpret_cast<PGE_GameSaveDB_private *>(data);
         PGE_assert(pgedb);
-        for(int i = 0; i < argc; i++)
-            printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+        //for(int i = 0; i < argc; i++)
+        //    printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
         //printf("\n");
         return 0;
     }
+
+    PGE_GameSaveDB *m_self = nullptr;
 
     sqlite3    *m_db = nullptr;
     std::string m_filePath;
@@ -47,7 +46,7 @@ struct PGE_GameSaveDB_private
         memset(sql, 0, 1024);
         snprintf(sql, 1023, "select count(type) from sqlite_master where type='table' and name='%s';", tableName);
         /* Execute SQL statement */
-        rc = sqlite3_exec(m_db, sql, selectCallback, this, &zErrMsg);
+        rc = sqlite3_exec(m_db, sql, dummyCallback, this, &zErrMsg);
         if(rc != SQLITE_OK)
         {
             m_errorString = std::string(zErrMsg);
@@ -140,7 +139,7 @@ struct PGE_GameSaveDB_private
         /* Execute insertion queries */
         for(size_t i = 0; i < sizeof(queries) / sizeof(const char*); i++)
         {
-            int rc = sqlite3_exec(m_db, queries[i], createCallback, 0, &zErrMsg);
+            int rc = sqlite3_exec(m_db, queries[i], dummyCallback, 0, &zErrMsg);
             if( rc != SQLITE_OK )
             {
                 errors += std::string(zErrMsg);
@@ -161,17 +160,22 @@ struct PGE_GameSaveDB_private
 
 PGE_GameSaveDB::PGE_GameSaveDB()
     : p(new PGE_GameSaveDB_private)
-{}
+{
+    p->m_self = this;
+}
 
 PGE_GameSaveDB::PGE_GameSaveDB(const std::string &filePath)
     : p(new PGE_GameSaveDB_private)
 {
+    p->m_self = this;
     open(filePath);
 }
 
 PGE_GameSaveDB::PGE_GameSaveDB(PGE_GameSaveDB &&o)
     : p(std::move(o.p))
-{}
+{
+    p->m_self = this;
+}
 
 PGE_GameSaveDB::~PGE_GameSaveDB()
 {
@@ -201,4 +205,59 @@ void PGE_GameSaveDB::close()
     p->m_db = nullptr;
     p->m_errorString.clear();
     p->m_filePath.clear();
+}
+
+bool PGE_GameSaveDB::load(int dataToLoad, bool resumeBackup)
+{
+    return false;
+}
+
+bool PGE_GameSaveDB::save()
+{
+    return false;
+}
+
+bool PGE_GameSaveDB::variableGet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
+                                 const std::string &name,
+                                 std::string *output,
+                                 const std::string &defValue)
+{
+    return false;
+}
+
+bool PGE_GameSaveDB::variableGet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
+                                 const std::string &name,
+                                 double *output,
+                                 const double &defValue)
+{
+    return false;
+}
+
+bool PGE_GameSaveDB::variableGet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
+                                 const std::string &name,
+                                 int64_t *output,
+                                 const int64_t &defValue)
+{
+    return false;
+}
+
+bool PGE_GameSaveDB::variableSet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
+                                 const std::string &name,
+                                 std::string *output)
+{
+    return false;
+}
+
+bool PGE_GameSaveDB::variableSet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
+                                 const std::string &name,
+                                 double *output)
+{
+    return false;
+}
+
+bool PGE_GameSaveDB::variableSet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
+                                 const std::string &name,
+                                 int64_t *output)
+{
+    return false;
 }
