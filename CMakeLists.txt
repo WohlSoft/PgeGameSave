@@ -8,6 +8,9 @@ enable_testing ()
 # Set C++11
 set(CMAKE_CXX_STANDARD 11)
 
+# Add library
+add_subdirectory(src)
+
 # Add test
-add_subdirectory (test)
+add_subdirectory(test)
 
