@@ -5,6 +5,7 @@
 #include <memory>
 #include <cstdint>
 #include <vector>
+#include <unordered_map>
 
 struct PGE_GameSaveDB_private;
 class PGE_GameSaveDB
@@ -103,16 +104,37 @@ public:
     //! Working state values are will be taken for a save
     struct SaveData
     {
-        int32_t     m_lives  = 1;
-        uint32_t    m_coins  = 0;
-        uint32_t    m_score  = 0;
-        uint32_t    m_stars  = 0;
+        struct PlayerState
+        {
+            bool        m_isValid = false;
+            int32_t     m_lives  = 1;
+            uint32_t    m_coins  = 0;
+            uint32_t    m_score  = 0;
+            uint32_t    m_character  = 0;
+            uint32_t    m_commonHealth = 1;
+            struct Character
+            {
+                uint32_t id = 1;
+                uint32_t stateId = 1;
+                uint32_t health = 1;
+                uint32_t legacy_itemId = 0;
+                uint32_t legacy_mountType = 0;
+                uint32_t legacy_mountId = 0;
+            };
+            std::vector<Character> m_characters;
+        };
 
+        PlayerState getPlayerState(size_t playerID);
+        void setPlayerState(size_t playerID, const PlayerState &state);
+
+        std::vector<PlayerState> m_playerStates;
+
+        uint32_t    m_stars  = 0;//Must be synchronized with a registry of gotten stars
         uint64_t    m_hubRecentWarp = 0;
 
         struct ItemViz
         {
-            uint32_t array_id = 0;
+            uint32_t arrayId = 0;
             bool     state = false;
         };
 
@@ -120,6 +142,7 @@ public:
         {
             std::string levelFile;
             int32_t     legacySection = -1;
+            uint64_t    arrayId = 0;
             int64_t     posX = 0;
             int64_t     posY = 0;
         };
@@ -129,9 +152,15 @@ public:
         uint32_t    m_worldMusicId = 0;
         std::string m_worldMusicFile;
 
-        std::vector<ItemViz> m_worldVisLevels;
-        std::vector<ItemViz> m_worldVisPaths;
-        std::vector<ItemViz> m_worldVisScenery;
+        typedef std::vector<ItemViz>            ItemVizList;
+        /*! Registry of gotten stars. Key must be: filenane.ext:posy:posy.
+            If pointed star NPC no more exists - pop it */
+        typedef std::unordered_map<std::string, GottenStar> StarsRegistry;
+
+        ItemVizList m_worldVisLevels;
+        ItemVizList m_worldVisPaths;
+        ItemVizList m_worldVisScenery;
+        StarsRegistry m_starsRegistry;
 
         bool        m_gameWasCompleted = false;
     } m_data;
