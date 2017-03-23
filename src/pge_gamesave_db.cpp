@@ -77,10 +77,10 @@ struct PGE_GameSaveDB_private
                     " id            INT NOT NULL"
                     ",playerId      INT NOT NULL"
                     ",state         INT DEFAULT 0"
-                    ",itemId        INT DEFAULT 0"
-                    ",mountType     INT DEFAULT 0"
-                    ",mountId       INT DEFAULT 0"
                     ",health        INT DEFAULT 0"
+                    ",legacyItemId    INT DEFAULT 0"
+                    ",legacyMountType INT DEFAULT 0"
+                    ",legacyMountId   INT DEFAULT 0"
                     ",PRIMARY KEY (id, playerId)"
                     ");",
 
@@ -91,6 +91,7 @@ struct PGE_GameSaveDB_private
                     ",lives         INT DEFAULT 0"
                     ",coins         INT DEFAULT 0"
                     ",score         INT DEFAULT 0"
+                    ",commonHealth  INT DEFAULT 0"
                     ",totalStars    INT DEFAULT 0"
                     ",worldMapPoxX  INT DEFAULT 0"
                     ",worldMapPoxY  INT DEFAULT 0"
@@ -129,7 +130,7 @@ struct PGE_GameSaveDB_private
                     " id            INT PRIMARY KEY AUTOINCREMENT NOT NULL"
                     ",access        INT DEFAULT 0"
                     ",type          INT DEFAULT 0"
-                    ",value         TEXT DEAFULT = ''"
+                    ",value         BLOB"
                     ");"
                 };
 
@@ -218,9 +219,8 @@ bool PGE_GameSaveDB::save()
 }
 
 bool PGE_GameSaveDB::variableGet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
-                                 const std::string &name,
-                                 std::string *output,
-                                 const std::string &defValue)
+                                 const std::string &name, std::string *output,
+                                 const std::string &defValue, PGE_GameSaveDB::VAR_TYPE type)
 {
     return false;
 }
@@ -243,21 +243,50 @@ bool PGE_GameSaveDB::variableGet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
 
 bool PGE_GameSaveDB::variableSet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
                                  const std::string &name,
-                                 std::string *output)
+                                 const std::string &output,
+                                 PGE_GameSaveDB::VAR_TYPE type)
 {
     return false;
 }
 
 bool PGE_GameSaveDB::variableSet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
                                  const std::string &name,
-                                 double *output)
+                                 double output)
 {
     return false;
 }
 
 bool PGE_GameSaveDB::variableSet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
                                  const std::string &name,
-                                 int64_t *output)
+                                 int64_t output)
 {
     return false;
+}
+
+
+PGE_GameSaveDB::SaveData::PlayerState PGE_GameSaveDB::SaveData::getPlayerState(size_t playerID)
+{
+    if((playerID == 0) || (playerID >= m_playerStates.size()))
+        return PlayerState();// Invalid playable character
+    return m_playerStates[playerID - 1];
+}
+
+void PGE_GameSaveDB::SaveData::setPlayerState(size_t playerID, const PGE_GameSaveDB::SaveData::PlayerState &state)
+{
+    if(playerID < 1)
+        return;
+    if(state.m_character < 1)
+        return;
+    if(state.m_character >= state.m_characters.size())
+        return;//Invalid characer ID
+    if(state.m_characters[state.m_character - 1].id < 1)
+        return;//Invalid characer ID
+
+    playerID -= 1;
+    if(playerID >= m_playerStates.size())
+    {
+        while(playerID >= m_playerStates.size())
+            m_playerStates.emplace_back();
+    }
+    m_playerStates[playerID] = state;
 }
