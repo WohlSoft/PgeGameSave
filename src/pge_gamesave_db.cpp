@@ -15,6 +15,31 @@
 #define PGE_assert assert
 #endif
 
+class PGE_GameSaveDB_SqliteString {
+private:
+    char* sqliteString;
+public:
+    PGE_GameSaveDB_SqliteString() : sqliteString(nullptr)
+    {}
+
+    ~PGE_GameSaveDB_SqliteString() {
+        if (sqliteString) {
+            sqlite3_free(sqliteString);
+        }
+    }
+
+    char** operator&() {
+        return &sqliteString;
+    }
+
+    operator std::string() {
+        if (!sqliteString)
+            return std::string("");
+        return std::string(sqliteString);
+    }
+};
+
+
 struct PGE_GameSaveDB_private
 {
     static int dummyCallback(void *, int /*argc*/, char ** /*argv*/, char ** /*azColName*/)
@@ -40,18 +65,12 @@ struct PGE_GameSaveDB_private
 
     bool tableExists(const char *tableName)
     {
-        int rc;
-        char *zErrMsg = 0;
-        char sql[1024];
-        memset(sql, 0, 1024);
-        snprintf(sql, 1023, "select count(type) from sqlite_master where type='table' and name='%s';", tableName);
         /* Execute SQL statement */
-        rc = sqlite3_exec(m_db, sql, dummyCallback, this, &zErrMsg);
+        std::string sql = std::string("select count(type) from sqlite_master where type='table' and name='") + tableName + "';";
+        PGE_GameSaveDB_SqliteString zErrMsg;
+        int rc = sqlite3_exec(m_db, sql.c_str(), dummyCallback, this, &zErrMsg);
         if(rc != SQLITE_OK)
-        {
-            m_errorString = std::string(zErrMsg);
-            sqlite3_free(zErrMsg);
-        }
+            m_errorString = zErrMsg;
         return true;
     }
 
@@ -134,19 +153,15 @@ struct PGE_GameSaveDB_private
                     ");"
                 };
 
-        char *zErrMsg = 0;
         std::string errors;
 
         /* Execute insertion queries */
         for(size_t i = 0; i < sizeof(queries) / sizeof(const char*); i++)
         {
+            PGE_GameSaveDB_SqliteString zErrMsg; // RAII <3
             int rc = sqlite3_exec(m_db, queries[i], dummyCallback, 0, &zErrMsg);
             if( rc != SQLITE_OK )
-            {
-                errors += std::string(zErrMsg);
-                errors.push_back('\n');
-                sqlite3_free(zErrMsg);
-            }
+                errors += static_cast<std::string>(zErrMsg) + '\n';
         }
 
         // === In next time to update existing tables, use next command ===
