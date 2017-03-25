@@ -172,11 +172,6 @@ PGE_GameSaveDB::PGE_GameSaveDB(const std::string &filePath)
     open(filePath);
 }
 
-PGE_GameSaveDB::PGE_GameSaveDB(PGE_GameSaveDB &&o)
-    : p(std::move(o.p))
-{
-    p->m_self = this;
-}
 
 PGE_GameSaveDB::~PGE_GameSaveDB()
 {

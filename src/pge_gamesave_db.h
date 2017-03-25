@@ -15,7 +15,7 @@ public:
     PGE_GameSaveDB();
     PGE_GameSaveDB(const std::string &filePath);
     PGE_GameSaveDB(const PGE_GameSaveDB &o) = delete;
-    PGE_GameSaveDB(PGE_GameSaveDB &&o);
+    PGE_GameSaveDB(PGE_GameSaveDB &&o) = default;
     virtual ~PGE_GameSaveDB();
     bool open(const std::string &filePath);
 
