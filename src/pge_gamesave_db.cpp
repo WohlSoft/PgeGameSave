@@ -3,6 +3,10 @@
 
 #include <memory.h>
 #include <stdio.h>
+#include <map>
+#include <vector>
+#include <string>
+#include <sstream>
 
 #ifdef PGE_ENGINE
 //The advantage of SDL_assert is guarantee of message box showing when assert doesn't passing,
@@ -47,13 +51,27 @@ struct PGE_GameSaveDB_private
         return 0;
     }
 
-    static int selectCallback(void *data, int argc, char **argv, char **azColName)
+//    static int selectCallback(void *data, int argc, char **argv, char **azColName)
+//    {
+//        PGE_GameSaveDB_private *pgedb = reinterpret_cast<PGE_GameSaveDB_private *>(data);
+//        PGE_assert(pgedb);
+//        //for(int i = 0; i < argc; i++)
+//        //    printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+//        //printf("\n");
+//        return 0;
+//    }
+
+    typedef std::map<std::string, std::string> Row;
+    typedef std::vector<Row> TableData;
+
+    static int fillTableCallback(void *data, int argc, char **argv, char **azColName)
     {
-        PGE_GameSaveDB_private *pgedb = reinterpret_cast<PGE_GameSaveDB_private *>(data);
-        PGE_assert(pgedb);
-        //for(int i = 0; i < argc; i++)
-        //    printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
-        //printf("\n");
+        TableData *dstTable = reinterpret_cast<TableData*>(data);
+        PGE_assert(dstTable);
+        Row row;
+        for(size_t i = 0; i < (size_t)argc; i++)
+            row.insert({azColName[i], argv[i] ? argv[i] : ""});
+        dstTable->push_back(row);
         return 0;
     }
 
@@ -62,6 +80,14 @@ struct PGE_GameSaveDB_private
     sqlite3    *m_db = nullptr;
     std::string m_filePath;
     std::string m_errorString;
+
+    struct Environment
+    {
+        //! Environment type
+        PGE_GameSaveDB::ENVIRONMENT envType = PGE_GameSaveDB::ENV_NONE;
+        //! Current filename
+        std::string                 fileName;
+    } m_env;
 
     bool tableExists(const char *tableName)
     {
@@ -105,7 +131,7 @@ struct PGE_GameSaveDB_private
 
                     "CREATE TABLE IF NOT EXISTS "
                     "PlayerStates("
-                    " id            INT PRIMARY KEY NOT NULL"
+                    " id INTEGER PRIMARY KEY NOT NULL"
                     ",characterId   INT DEFAULT 0"
                     ",lives         INT DEFAULT 0"
                     ",coins         INT DEFAULT 0"
@@ -119,25 +145,25 @@ struct PGE_GameSaveDB_private
 
                     "CREATE TABLE IF NOT EXISTS "
                     "World_visibleLevels("
-                    " ArrayId       INT PRIMARY KEY AUTOINCREMENT NOT NULL"
+                    " ArrayId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL"
                     ",isVisible     INT DEFAULT 1"
                     ");",
 
                     "CREATE TABLE IF NOT EXISTS "
                     "World_visiblePaths("
-                    " ArrayId       INT PRIMARY KEY AUTOINCREMENT NOT NULL"
+                    " ArrayId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL"
                     ",isVisible     INT DEFAULT 1"
                     ");",
 
                     "CREATE TABLE IF NOT EXISTS "
                     "World_visibleSceneries("
-                    " ArrayId       INT PRIMARY KEY AUTOINCREMENT NOT NULL"
+                    " ArrayId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL"
                     ",isVisible     INT DEFAULT 1"
                     ");",
 
                     "CREATE TABLE IF NOT EXISTS "
                     "World_gottenStars("
-                    " levelFileName INT PRIMARY KEY NOT NULL"
+                    " levelFileName INTEGER PRIMARY KEY NOT NULL"
                     ",arrayId       INT DEFAULT 0"
                     ",posX          INT DEFAULT 0"
                     ",posY          INT DEFAULT 0"
@@ -146,9 +172,11 @@ struct PGE_GameSaveDB_private
                     /* A table for user data storing */
                     "CREATE TABLE IF NOT EXISTS "
                     "UserData("
-                    " id            INT PRIMARY KEY AUTOINCREMENT NOT NULL"
-                    ",access        INT DEFAULT 0"
-                    ",type          INT DEFAULT 0"
+                    " id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL"
+                    ",access        INTEGER DEFAULT 0"
+                    ",filename      VARCHAR DEFAULT ''"
+                    ",name          VARCHAR NOT NULL"
+                    ",type          INTEGER DEFAULT 0"
                     ",value         BLOB"
                     ");"
                 };
@@ -220,19 +248,106 @@ void PGE_GameSaveDB::close()
 
 bool PGE_GameSaveDB::load(int dataToLoad, bool resumeBackup)
 {
+    //TODO: Implement loading data of SaveData structure
     return false;
 }
 
 bool PGE_GameSaveDB::save()
 {
+    //TODO: Implement "hard" saving data of SaveData structure
     return false;
+}
+
+bool PGE_GameSaveDB::saveAuto()
+{
+    //TODO: Implement "soft" saving data of SaveData structure (aka, create backup of current "floating in air" state)
+    return false;
+}
+
+void PGE_GameSaveDB::setEnvironment(ENVIRONMENT envType, const std::string &filename)
+{
+    p->m_env.envType    = envType;
+    p->m_env.fileName   = filename;
 }
 
 bool PGE_GameSaveDB::variableGet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
                                  const std::string &name, std::string *output,
                                  const std::string &defValue, PGE_GameSaveDB::VAR_TYPE type)
 {
-    return false;
+    // Output must be set!
+    PGE_assert(output);
+    // Set target access level
+    std::string access_level;
+    switch(al)
+    {
+    case VAR_ACCESS_GLOBAL:
+        access_level = "access=0";
+        break;
+    case VAR_ACCESS_THIS_LEVEL:
+        access_level = "access=1 AND filename='" + p->m_env.fileName + "'";
+        break;
+    case VAR_ACCESS_ANY_LEVEL:
+        access_level = "access=2";
+        break;
+    case VAR_ACCESS_WORLD:
+        access_level = "access=3";
+        break;
+    }
+
+    //Find existing field. If exists, modify, or create new
+    PGE_GameSaveDB_private::TableData table;
+    std::string sql = "SELECT * FROM UserData WHERE ";
+    sql += "name='" + name + "' AND " + access_level + " LIMIT 1;";
+
+    PGE_GameSaveDB_SqliteString zErrMsg;
+    int rc = sqlite3_exec(p->m_db, sql.c_str(), PGE_GameSaveDB_private::fillTableCallback, &table, &zErrMsg);
+    if(rc != SQLITE_OK)
+    {
+        p->m_errorString = zErrMsg;
+        *output = defValue;
+        return false;
+    }
+
+    if(table.size() < 1)
+    {
+        *output = defValue;
+        return false;
+    }
+    else
+    {
+        int64_t id = table[0].find("id") != table[0].end() ? std::atol(table[0]["id"].c_str()) : -1;
+        if(id < 0)
+        {
+            p->m_errorString = "INVALID TABLE ID!!!";
+            return false;
+        }
+        PGE_GameSaveDB_private::Row::iterator s = table[0].find("value");
+        if(s != table[0].end())
+        {
+            switch(type)
+            {
+            case VTYPE_PLAIN_TEXT:
+            case VTYPE_INTEGER:
+            case VTYPE_FLOATING_POINT:
+            case VTYPE_JSON:
+                *output = s->second;
+                break;
+            case VTYPE_EXT_ENCRYPTED:
+            {
+                //TODO: Implemen the decrypter callback here
+                *output = s->second;
+                break;
+            }
+            }
+        }
+        else
+        {
+            *output = defValue;
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool PGE_GameSaveDB::variableGet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
@@ -240,37 +355,141 @@ bool PGE_GameSaveDB::variableGet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
                                  double *output,
                                  const double &defValue)
 {
-    return false;
+    PGE_assert(output);
+    std::string out;
+    std::ostringstream defValueN;
+    defValueN.precision(16);
+    defValueN << defValue;
+    bool ret = variableGet(al, name, &out, defValueN.str(), VTYPE_FLOATING_POINT);
+    if(ret)
+        *output = std::strtod(out.c_str(), NULL);
+    return ret;
 }
+
 
 bool PGE_GameSaveDB::variableGet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
                                  const std::string &name,
                                  int64_t *output,
                                  const int64_t &defValue)
 {
-    return false;
+    PGE_assert(output);
+    std::string out;
+    std::ostringstream defValueN;
+    defValueN << defValue;
+    bool ret = variableGet(al, name, &out, defValueN.str(), VTYPE_INTEGER);
+    if(ret)
+        *output = (int64_t)std::stoll(out.c_str(), NULL);
+    return ret;
 }
+
 
 bool PGE_GameSaveDB::variableSet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
                                  const std::string &name,
-                                 const std::string &output,
+                                 const std::string &input,
                                  PGE_GameSaveDB::VAR_TYPE type)
 {
-    return false;
+    //Set target access level
+    std::string access_level;
+    std::string ecrypted_temp;
+    const std::string *input_d = &input;
+    switch(al)
+    {
+    case VAR_ACCESS_GLOBAL:
+        access_level = "access=0";
+        break;
+    case VAR_ACCESS_THIS_LEVEL:
+        access_level = "access=1 AND filename='" + p->m_env.fileName + "'";
+        break;
+    case VAR_ACCESS_ANY_LEVEL:
+        access_level = "access=2";
+        break;
+    case VAR_ACCESS_WORLD:
+        access_level = "access=3";
+        break;
+    }
+
+    //Find existing field. If exists, modify, or create new
+    PGE_GameSaveDB_private::TableData table;
+    std::string sql = std::string("select * from UserData where name='") + name + "' AND " + access_level + " LIMIT 1;";
+    PGE_GameSaveDB_SqliteString zErrMsg;
+    int rc = sqlite3_exec(p->m_db, sql.c_str(), PGE_GameSaveDB_private::fillTableCallback, &table, &zErrMsg);
+    if(rc != SQLITE_OK)
+    {
+        p->m_errorString = zErrMsg;
+        return false;
+    }
+
+    if(type == VTYPE_EXT_ENCRYPTED)
+    {
+        //TODO: Implemen the encrypter callback here
+        ecrypted_temp = input;
+        input_d = &ecrypted_temp;
+    }
+
+    sqlite3_stmt *stmt;
+    if(table.size() < 1)
+    {
+        sqlite3_prepare(p->m_db, "INSERT INTO UserData (access, filename, name, type, value) "
+                                 "VALUES (?, ?, ?, ?, ?);", -1, &stmt, 0);
+        sqlite3_bind_int64(stmt,  1, (int64_t)al);
+        sqlite3_bind_text(stmt, 2, (al == VAR_ACCESS_THIS_LEVEL ? p->m_env.fileName.c_str() : ""), -1, 0);
+        sqlite3_bind_text(stmt, 3, name.c_str(), -1, 0);
+        sqlite3_bind_int64(stmt,  4, (int64_t)type);
+        sqlite3_bind_blob64(stmt, 5, input_d->c_str(), input_d->size(), 0);
+
+        rc = sqlite3_step(stmt);
+        if(rc != SQLITE_DONE)
+        {
+            p->m_errorString = sqlite3_errmsg(p->m_db);
+            return false;
+        }
+        sqlite3_finalize(stmt);
+    }
+    else
+    {
+        //Modify
+        int64_t id = table[0].find("id") != table[0].end() ? std::atol(table[0]["id"].c_str()) : -1;
+        if(id < 0)
+        {
+            p->m_errorString = "INVALID TABLE ID!!!";
+            return false;
+        }
+        sqlite3_prepare(p->m_db, "UPDATE UserData SET access=?, filename=?, name=?, type=?, value=? "
+                                 "WHERE id=? LIMIT 1;", -1, &stmt, 0);
+        sqlite3_bind_int64(stmt,  1, (int64_t)al);
+        sqlite3_bind_text(stmt, 2, (al == VAR_ACCESS_THIS_LEVEL ? p->m_env.fileName.c_str() : ""), -1, 0);
+        sqlite3_bind_text(stmt, 3, name.c_str(), -1, 0);
+        sqlite3_bind_int64(stmt,  4, (int64_t)type);
+        sqlite3_bind_blob64(stmt, 5, input_d->c_str(), input_d->size(), 0);
+        sqlite3_bind_int64(stmt,  6, id);
+
+        rc = sqlite3_step(stmt);
+        if(rc != SQLITE_DONE)
+        {
+            p->m_errorString = sqlite3_errmsg(p->m_db);
+            return false;
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    return true;
 }
 
 bool PGE_GameSaveDB::variableSet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
                                  const std::string &name,
-                                 double output)
+                                 double input)
 {
-    return false;
+    std::ostringstream n;
+    n.precision(16);
+    n << input;
+    return PGE_GameSaveDB::variableSet(al, name, n.str(), VTYPE_FLOATING_POINT);
 }
 
 bool PGE_GameSaveDB::variableSet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
                                  const std::string &name,
-                                 int64_t output)
+                                 int64_t input)
 {
-    return false;
+    return PGE_GameSaveDB::variableSet(al, name, std::to_string(input), VTYPE_INTEGER);
 }
 
 

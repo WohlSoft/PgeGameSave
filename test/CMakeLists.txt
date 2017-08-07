@@ -6,7 +6,7 @@ add_executable (PGEGameSaveTest
                 )
                 
 add_dependencies(PGEGameSaveTest PGEGameSaveLib)
-target_link_libraries(PGEGameSaveTest PGEGameSaveLib)
+target_link_libraries(PGEGameSaveTest PGEGameSaveLib sqlite3)
 
 add_test (NAME PGEGameSaveTest COMMAND PGEGameSaveTest)
 

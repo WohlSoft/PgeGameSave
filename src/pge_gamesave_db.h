@@ -73,13 +73,31 @@ public:
                               have easier detect encrypted data from regular plane-text string)*/
     };
 
+    enum ENVIRONMENT
+    {
+        ENV_NONE  = 0,
+        ENV_LEVEL ,
+        ENV_WORLD_MAP,
+    };
+
     enum VAR_ACCESS_LEVEL
     {
-        VAR_ACCESS_GLOBAL = 0,
-        VAR_ACCESS_THIS_LEVEL,
-        VAR_ACCESS_ANY_LEVEL,
-        VAR_ACCESS_WORLD,
+        //! Any access level granted read this
+        VAR_ACCESS_GLOBAL       = 0,
+        //! Level file of specific filename environment can access this
+        VAR_ACCESS_THIS_LEVEL   = 1,
+        //! Any level file environment allowed to read this
+        VAR_ACCESS_ANY_LEVEL    = 2,
+        //! Any world map environment allowed to read this
+        VAR_ACCESS_WORLD        = 3,
     };
+
+    /**
+     * @brief Set current access environment
+     * @param al Access level type
+     * @param filename Current level file, required for "this level" permission.
+     */
+    void setEnvironment(ENVIRONMENT al, const std::string &filename = std::string());
 
     bool variableGet(VAR_ACCESS_LEVEL al, const std::string &name,
                      std::string *output, const std::string &defValue = "",
@@ -92,14 +110,14 @@ public:
                      int64_t      *output, const int64_t &defValue = 0);
 
     bool variableSet(VAR_ACCESS_LEVEL al,
-                     const std::string &name, const std::string  &output,
+                     const std::string &name, const std::string  &input,
                      VAR_TYPE type = VTYPE_PLAIN_TEXT);
     bool variableSet(VAR_ACCESS_LEVEL al,
                      const std::string &name,
-                     double       output);
+                     double       input);
     bool variableSet(VAR_ACCESS_LEVEL al,
                      const std::string &name,
-                     int64_t      output);
+                     int64_t      input);
 
     //! Working state values are will be taken for a save
     struct SaveData
