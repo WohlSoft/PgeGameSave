@@ -83,6 +83,10 @@ struct PGE_GameSaveDB_private
 
     struct Environment
     {
+        //! Hard save ID (manully savedByUser). -1 means N/A
+        int32_t saveId        = -1;
+        //! Soft save ID (for backup-on-a-fly. On save discard can be flushed. On crash or power surge can be resumed). -1 means N/A
+        int32_t saveTempId    = -1;
         //! Environment type
         PGE_GameSaveDB::ENVIRONMENT envType = PGE_GameSaveDB::ENV_NONE;
         //! Current filename
@@ -105,10 +109,20 @@ struct PGE_GameSaveDB_private
         /* Create the new tables if there are not existed */
         const char *queries[] =
                 {
+                    //0
                     "CREATE TABLE IF NOT EXISTS "
                     "EpisodeSetup("
                     " key           CHAR(50) PRIMARY KEY NOT NULL"
                     ",value         TEXT DEFAULT ''"
+                    ");",
+
+                    //1
+                    "CREATE TABLE IF NOT EXISTS "
+                    "GameSaves("
+                    " id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL"
+                    ",save_id INTEGER NOT NULL"
+                    ",title VARCHAR DEFAULT ''"
+                    ",type  INTEGER DEFAULT 0"
                     ");",
 
                     /* Values to store into this table:
@@ -117,21 +131,25 @@ struct PGE_GameSaveDB_private
                      *      isGameComplete is Game Completed
                      */
 
+                    //2
                     "CREATE TABLE IF NOT EXISTS "
                     "CharacterStates("
                     " id            INT NOT NULL"
                     ",playerId      INT NOT NULL"
+                    ",save_id       INTEGER NOT NULL"
                     ",state         INT DEFAULT 0"
                     ",health        INT DEFAULT 0"
                     ",legacyItemId    INT DEFAULT 0"
                     ",legacyMountType INT DEFAULT 0"
                     ",legacyMountId   INT DEFAULT 0"
-                    ",PRIMARY KEY (id, playerId)"
+                    ",PRIMARY KEY (id, playerId, save_id)"
                     ");",
 
+                    //3
                     "CREATE TABLE IF NOT EXISTS "
                     "PlayerStates("
-                    " id INTEGER PRIMARY KEY NOT NULL"
+                    " id            INTEGER NOT NULL"
+                    ",save_id       INTEGER NOT NULL"
                     ",characterId   INT DEFAULT 0"
                     ",lives         INT DEFAULT 0"
                     ",coins         INT DEFAULT 0"
@@ -141,38 +159,53 @@ struct PGE_GameSaveDB_private
                     ",worldMapPoxX  INT DEFAULT 0"
                     ",worldMapPoxY  INT DEFAULT 0"
                     ",recentHubWarp INT DEFAULT -1"
+                    ",PRIMARY KEY (id, save_id)"
                     ");",
 
+                    //4
                     "CREATE TABLE IF NOT EXISTS "
                     "World_visibleLevels("
-                    " ArrayId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL"
+                    " id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL"
+                    ",save_id       INTEGER NOT NULL"
+                    ",arrayId INTEGER NOT NULL"
                     ",isVisible     INT DEFAULT 1"
                     ");",
 
+                    //5
                     "CREATE TABLE IF NOT EXISTS "
                     "World_visiblePaths("
-                    " ArrayId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL"
+                    " id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL"
+                    ",save_id       INTEGER NOT NULL"
+                    ",arrayId INTEGER NOT NULL"
                     ",isVisible     INT DEFAULT 1"
                     ");",
 
+                    //6
                     "CREATE TABLE IF NOT EXISTS "
                     "World_visibleSceneries("
-                    " ArrayId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL"
+                    " id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL"
+                    ",save_id       INTEGER NOT NULL"
+                    ",arrayId INTEGER NOT NULL"
                     ",isVisible     INT DEFAULT 1"
                     ");",
 
+                    //7
                     "CREATE TABLE IF NOT EXISTS "
                     "World_gottenStars("
-                    " levelFileName INTEGER PRIMARY KEY NOT NULL"
+                    " id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL"
+                    ",save_id       INTEGER NOT NULL"
+                    ",levelFileName INTEGER NOT NULL"
                     ",arrayId       INT DEFAULT 0"
                     ",posX          INT DEFAULT 0"
                     ",posY          INT DEFAULT 0"
                     ");",
 
+                    //8
                     /* A table for user data storing */
                     "CREATE TABLE IF NOT EXISTS "
                     "UserData("
                     " id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL"
+                    ",save_id       INTEGER NOT NULL"
                     ",access        INTEGER DEFAULT 0"
                     ",filename      VARCHAR DEFAULT ''"
                     ",name          VARCHAR NOT NULL"
@@ -192,10 +225,7 @@ struct PGE_GameSaveDB_private
                 errors += static_cast<std::string>(zErrMsg) + '\n';
         }
 
-        // === In next time to update existing tables, use next command ===
-        //ALTER TABLE {tableName} ADD COLUMN COLNew {type};
-
-        return true;
+        return errors.empty();
     }
 };
 
@@ -244,6 +274,47 @@ void PGE_GameSaveDB::close()
     p->m_db = nullptr;
     p->m_errorString.clear();
     p->m_filePath.clear();
+}
+
+PGE_GameSaveDB::GameSaveList PGE_GameSaveDB::getchGameSaves()
+{
+    PGE_assert(p && p->m_db);
+    GameSaveList list;
+    PGE_GameSaveDB_private::TableData table;
+    std::string sql = "SELECT * FROM GameSaves ORDER BY save_id ASC;";
+
+    PGE_GameSaveDB_SqliteString zErrMsg;
+    int rc = sqlite3_exec(p->m_db, sql.c_str(), PGE_GameSaveDB_private::fillTableCallback, &table, &zErrMsg);
+    if(rc != SQLITE_OK)
+    {
+        p->m_errorString = zErrMsg;
+        return list;
+    }
+
+    for(PGE_GameSaveDB_private::Row &row : table)
+    {
+        GameSaveEntry se;
+        se.id       = (uint32_t)std::stoul(row["save_id"].c_str(), NULL);
+        se.type     = (GameSaveEntry::Type)std::stoul(row["type"].c_str(), NULL);
+        se.title    = row["title"];
+        if(se.title.empty())
+        {
+            std::ostringstream s;
+            s << "Game Save #" << se.id;
+            se.title = s.str();
+        }
+        list.push_back(se);
+    }
+
+    return list;
+}
+
+bool PGE_GameSaveDB::initGameSave(uint32_t save_id, bool clearBackup)
+{
+    /*TODO: Implement search of existing gamesave entry
+     * and create if not exists, or use exist and generate working data
+     * by copying of data into separated special gamesave slot */
+    return false;
 }
 
 bool PGE_GameSaveDB::load(int dataToLoad, bool resumeBackup)
@@ -297,7 +368,7 @@ bool PGE_GameSaveDB::variableGet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
     //Find existing field. If exists, modify, or create new
     PGE_GameSaveDB_private::TableData table;
     std::string sql = "SELECT * FROM UserData WHERE ";
-    sql += "name='" + name + "' AND " + access_level + " LIMIT 1;";
+    sql += "save_id=" + std::to_string(p->m_env.saveTempId) + " AND name='" + name + "' AND " + access_level + " LIMIT 1;";
 
     PGE_GameSaveDB_SqliteString zErrMsg;
     int rc = sqlite3_exec(p->m_db, sql.c_str(), PGE_GameSaveDB_private::fillTableCallback, &table, &zErrMsg);
@@ -410,7 +481,10 @@ bool PGE_GameSaveDB::variableSet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
 
     //Find existing field. If exists, modify, or create new
     PGE_GameSaveDB_private::TableData table;
-    std::string sql = std::string("select * from UserData where name='") + name + "' AND " + access_level + " LIMIT 1;";
+    std::string sql = std::string("SELECT * FROM UserData WHERE name='") + name + "' "
+                                  "AND " + access_level + " "
+                                  "AND save_id=" + std::to_string(p->m_env.saveTempId) + " "
+                                  "LIMIT 1;";
     PGE_GameSaveDB_SqliteString zErrMsg;
     int rc = sqlite3_exec(p->m_db, sql.c_str(), PGE_GameSaveDB_private::fillTableCallback, &table, &zErrMsg);
     if(rc != SQLITE_OK)
@@ -429,13 +503,14 @@ bool PGE_GameSaveDB::variableSet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
     sqlite3_stmt *stmt;
     if(table.size() < 1)
     {
-        sqlite3_prepare(p->m_db, "INSERT INTO UserData (access, filename, name, type, value) "
-                                 "VALUES (?, ?, ?, ?, ?);", -1, &stmt, 0);
-        sqlite3_bind_int64(stmt,  1, (int64_t)al);
-        sqlite3_bind_text(stmt, 2, (al == VAR_ACCESS_THIS_LEVEL ? p->m_env.fileName.c_str() : ""), -1, 0);
-        sqlite3_bind_text(stmt, 3, name.c_str(), -1, 0);
-        sqlite3_bind_int64(stmt,  4, (int64_t)type);
-        sqlite3_bind_blob64(stmt, 5, input_d->c_str(), input_d->size(), 0);
+        sqlite3_prepare(p->m_db, "INSERT INTO UserData (save_id, access, filename, name, type, value) "
+                                 "VALUES (?, ?, ?, ?, ?, ?);", -1, &stmt, 0);
+        sqlite3_bind_int64(stmt,  1, (int64_t)p->m_env.saveTempId);
+        sqlite3_bind_int64(stmt,  2, (int64_t)al);
+        sqlite3_bind_text(stmt, 3, (al == VAR_ACCESS_THIS_LEVEL ? p->m_env.fileName.c_str() : ""), -1, 0);
+        sqlite3_bind_text(stmt, 4, name.c_str(), -1, 0);
+        sqlite3_bind_int64(stmt,  5, (int64_t)type);
+        sqlite3_bind_blob64(stmt, 6, input_d->c_str(), input_d->size(), 0);
 
         rc = sqlite3_step(stmt);
         if(rc != SQLITE_DONE)
@@ -455,13 +530,14 @@ bool PGE_GameSaveDB::variableSet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
             return false;
         }
         sqlite3_prepare(p->m_db, "UPDATE UserData SET access=?, filename=?, name=?, type=?, value=? "
-                                 "WHERE id=? LIMIT 1;", -1, &stmt, 0);
+                                 "WHERE save_id=? AND id=? LIMIT 1;", -1, &stmt, 0);
         sqlite3_bind_int64(stmt,  1, (int64_t)al);
         sqlite3_bind_text(stmt, 2, (al == VAR_ACCESS_THIS_LEVEL ? p->m_env.fileName.c_str() : ""), -1, 0);
         sqlite3_bind_text(stmt, 3, name.c_str(), -1, 0);
         sqlite3_bind_int64(stmt,  4, (int64_t)type);
         sqlite3_bind_blob64(stmt, 5, input_d->c_str(), input_d->size(), 0);
-        sqlite3_bind_int64(stmt,  6, id);
+        sqlite3_bind_int64(stmt,  6, (int64_t)p->m_env.saveTempId);
+        sqlite3_bind_int64(stmt,  7, id);
 
         rc = sqlite3_step(stmt);
         if(rc != SQLITE_DONE)

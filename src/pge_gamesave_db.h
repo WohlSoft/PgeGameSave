@@ -32,6 +32,35 @@ public:
         DATA_EVERYTHING             = 0xFFFFFFFF,
     };
 
+    struct GameSaveEntry
+    {
+        enum Type
+        {
+            // Created for backups-on-a-fly
+            TYPE_TEMP       = 0,
+            // Containing persistent copy of gamesave
+            TYPE_PERSISTENT = 1
+        };
+        uint32_t    id;
+        std::string title;
+        Type        type;
+    };
+    typedef std::vector<GameSaveEntry> GameSaveList;
+
+    /**
+     * @brief Retreive list of available game saves
+     * @return list of available game saves
+     */
+    GameSaveList getchGameSaves();
+
+    /**
+     * @brief Create new or load existing game save by SaveID key
+     * @param id ID of gamesave
+     * @param clearBackup Remove backup entries and re-generate them from "hard" save
+     * @return true if game-save successfully loaded, false if any error has occouped
+     */
+    bool initGameSave(uint32_t save_id, bool clearBackup = false);
+
     /**
      * @brief Load game state from the file.
      * @param resumeBackup Resume state with keeping the temporary data of the soft saves
