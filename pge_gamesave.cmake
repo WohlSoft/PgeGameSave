@@ -1,4 +1,4 @@
-message("Path to PGE Game Save is [${CMAKE_CURRENT_LIST_DIR}]")
+# message("Path to PGE Game Save is [${CMAKE_CURRENT_LIST_DIR}]")
 include_directories(${CMAKE_CURRENT_LIST_DIR}/src)
 
 set(PGE_GAMESAVE_SRCS)
