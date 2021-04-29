@@ -314,7 +314,31 @@ bool PGE_GameSaveDB::initGameSave(uint32_t save_id, bool clearBackup)
     /*TODO: Implement search of existing gamesave entry
      * and create if not exists, or use exist and generate working data
      * by copying of data into separated special gamesave slot */
-    return false;
+    PGE_assert(p && p->m_db);
+    int rc = 0;
+    PGE_GameSaveDB_SqliteString zErrMsg;
+    PGE_GameSaveDB_private::TableData table;
+    std::string sql;
+
+    if(clearBackup)
+    {
+
+    }
+
+    sql += "SELECT * from GameSaves WHERE save_id=" + std::to_string(save_id) + " AND type=0 LIMIT 1;";
+    rc = sqlite3_exec(p->m_db, sql.c_str(), PGE_GameSaveDB_private::fillTableCallback, &table, &zErrMsg);
+    if(rc != SQLITE_OK)
+    {
+        p->m_errorString = zErrMsg;
+        return false;
+    }
+
+    if(table.size() > 0)
+    {
+
+    }
+
+    return true;
 }
 
 bool PGE_GameSaveDB::load(int dataToLoad, bool resumeBackup)
@@ -404,11 +428,11 @@ bool PGE_GameSaveDB::variableGet(PGE_GameSaveDB::VAR_ACCESS_LEVEL al,
                 *output = s->second;
                 break;
             case VTYPE_EXT_ENCRYPTED:
-            {
-                //TODO: Implemen the decrypter callback here
-                *output = s->second;
-                break;
-            }
+                {
+                    //TODO: Implemen the decrypter callback here
+                    *output = s->second;
+                    break;
+                }
             }
         }
         else
